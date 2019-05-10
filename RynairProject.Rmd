@@ -1,0 +1,74 @@
+---
+title: "Rynair Project"
+output: html_notebook
+---
+data <- read.csv("E:/rynair/training.csv")
+head(data)
+#Dropping DepartureDate column
+data$ï..DepartureDate <- NULL
+#splitting data set intto data_train and data_test for training and testing
+#but before splitting i want find correlation between columns and delete  unneccesary columns
+#As i observed route and Arrival stations didn't have much impact on TOW, so i'm droppping those two columns.
+#i want to drop DepartureYear also
+data$Route <- NULL
+data$ArrivalAirport <- NULL
+data$DepartureYear <- NULL
+data$DepartureMonth <- NULL
+head(data)
+#I think TOW depends on DepartureAirport because of Altitude of that Place where Airport is located, so im converting dataframe into numeric so it replaces character to integer, it will be easy to do anlysis  
+library(dplyr)
+df = as.data.frame(sapply(data, as.numeric))
+unique(data$DepartureAirport)
+library(Hmisc) 
+#needed to use "cor"" function
+c <- cor(data) 
+library(corrplot)
+corrplot(c, method="circle")
+#As per corrleation plot, ActualTOW is mostly related to ActualFlightTime,ActualTotalFuel,FLownPassengers,BagsCount
+#I think it also depends on altitude, but we dont have any direct information on altitude, but we have indirect information in the form  of "DepartureAirport" 
+#So we keep those columns only and drop remaining
+#FlightBagsWeight is directly proportional to BagsCount so we drop FlightBagsWeight
+data$DepartureDay <- NULL
+data$FlightNumber <- NULL
+data$FlightBagsWeight <- NULL
+head(data)
+#split dataframe into two parts train_data and test_data
+# Create Training and Test data -
+set.seed(100)  # setting seed to reproduce results of random sampling
+trainingRowIndex <- sample(1:nrow(data), 0.8*nrow(data))  # row indices for training data
+train_data <- data[trainingRowIndex, ]  # model training data
+test_data  <- data[-trainingRowIndex, ]   # test data
+# Building the model on training data
+lmMod <- lm(ActualTOW ~ DepartureAirport+ActualFlightTime+ActualTotalFuel+FLownPassengers+BagsCount, data=train_data)
+predictions <- predict(lmMod, test_data)
+summary(lmMod)
+pred_summary <- summary(lmMod)
+install.packages("xlsx")
+library("xlsx")
+AIC (lmMod)
+#From the model summary, the model p value and predictor’s p value are less than the significance level. So you have a statistically significant model.
+#prediction accuracy and error rates Calculation
+actuals_preds <- data.frame(cbind(actuals=test_data$ActualTOW, predicteds=predictions))
+correlation_accuracy <- cor(actuals_preds)
+
+correlation_accuracy 
+#correlation_accuracy = 0.9524272
+head(actuals_preds)
+# Min-Max Accuracy Calculation
+min_max_accuracy <- mean(apply(actuals_preds, 1, min) / apply(actuals_preds, 1, max)) 
+min_max_accuracy
+#min_max_accuracy = 98%
+# MAPE Calculation
+mape <- mean(abs((actuals_preds$predicteds - actuals_preds$actuals))/actuals_preds$actuals)
+mape
+#mape is 1.1% 
+#we have pretty good model
+
+validation <- read.csv("E:/rynair/validation.csv")
+df_validation = as.data.frame(sapply(validation, as.numeric))
+
+
+output <- predict(lmMod, df_validation)
+write.csv(output, "E:/rynair/output.csv")
+
+
